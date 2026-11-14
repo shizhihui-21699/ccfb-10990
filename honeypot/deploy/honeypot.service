@@ -1,0 +1,42 @@
+# 蜜罐 systemd 单元示例:非 root 运行 + 内核级加固
+# 配合防火墙出站丢弃规则使用(见 README "网络层")
+[Unit]
+Description=Low-interaction honeypot (SSH/HTTP)
+After=network.target
+
+[Service]
+Type=simple
+# 专用低权限用户:useradd -r -s /usr/sbin/nologin honeypot
+User=honeypot
+Group=honeypot
+WorkingDirectory=/opt/honeypot
+ExecStart=/opt/honeypot/.venv/bin/python -m server.main
+Restart=on-failure
+RestartSec=5
+
+# ---- 加固 ----
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+# 只放开数据目录
+ReadWritePaths=/opt/honeypot/data
+# 禁止加载内核模块/修改内核参数
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+# 限制系统调用面
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+# 资源上限(与应用层限制互为补充)
+LimitNOFILE=4096
+MemoryMax=512M
+TasksMax=64
+# 网络命名空间隔离(可选,更强):如启用,需用 IPAddressAllow 放行管理网段
+# IPAddressDeny=any
+# IPAddressAllow=10.0.0.0/8
+
+[Install]
+WantedBy=multi-user.target
